@@ -30,7 +30,7 @@ RSA 加密只保留在**请求方向**：登录页仍用新公钥加密发出的
 
 ## 在 Windows 上跑起来（exact 步骤）
 
-前提：已装 Node.js（建议 Node 20 LTS 或 Node 24，与客户端同一版本即可）。全程在 PowerShell 或 cmd 里操作。
+前提：已装 Node.js 24（必须用 24：后端用了 `node:sqlite`，Node 20 没有这个模块，起不来）。全程在 PowerShell 或 cmd 里操作。
 
 ```powershell
 cd <仓库目录>\server

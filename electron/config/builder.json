@@ -6,12 +6,16 @@
     "output": "out"
   },
   "asar": true,
+  "asarUnpack": [
+    "**/*.node"
+  ],
   "files": [
     "**/*",
     "!frontend/",
     "!run/",
     "!logs/",
-    "!data/"
+    "!data/",
+    "!server/data/"
   ],
   "extraResources": {
     "from": "build/extraResources/",
