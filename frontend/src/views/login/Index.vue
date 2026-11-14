@@ -39,9 +39,11 @@ import {ipc} from "@/utils/ipcRenderer";
 
 import { DocumentCopy } from '@element-plus/icons-vue'
 import {onMounted, reactive, ref} from 'vue';
+import { useRouter } from 'vue-router';
 
 
 const submitLoading = ref(false)
+const router = useRouter()
 
 const animationContainer = ref(null);
 
@@ -74,6 +76,7 @@ const copyMachineCode = ()=>{
 // # 定义通信频道，即路由
 const ipcApiRoute = {
   getMachineCode: 'controller.login.getMachineCode',
+  saveAuthCode: 'controller.login.saveAuthCode',
 }
 
 onMounted(()=>{
@@ -110,14 +113,28 @@ const handleLogin = () => {
   let data = {machineCode: machineCode,authCode: '',timestamp: oldTimestamp};
 
   let jsonData = {timestamp: oldTimestamp,jsonData: encrypt(JSON.stringify(data))};
-  post("/authManage/clientAuth",jsonData).then(res => {
-    // Fail closed：客户端已彻底移除 RSA 私钥，无法验证授权服务器响应的真实性。
-    // 在授权服务器建成、并实现可验证的响应方案（服务端签名、客户端公钥验签）之前，
-    // 任何响应都视为不可信，登录一律拒绝。禁止在此恢复 decrypt、或采信未经验证的响应。
-    Notification.message({ message: '授权服务未就绪，登录已拒绝', type: 'error' });
+  post("/authManage/clientAuth",jsonData).then(async res => {
+    // 新协议：授权服务器返回明文 JSON {code: 200, authCode, expiryDate}。
+    // 原版的 RSA 加密响应已废弃：客户端私钥已随公开仓库泄露并被删除，
+    // 客户端无法再解密响应，因此响应改为明文；code: 200 是共享请求拦截器的硬性要求。
+    // 详见 server/README.md「与原版协议的偏差」。
+    if (!res || !res.authCode || Number(res.expiryDate) <= Date.now()) {
+      Notification.message({ message: '授权无效或已过期，请联系管理员', type: 'error' });
+      submitLoading.value = false;
+      return;
+    }
+    const saveRes = await ipc.invoke(ipcApiRoute.saveAuthCode, {authCode: res.authCode, expiryDate: res.expiryDate});
+    if (!saveRes || !saveRes.status) {
+      Notification.message({ message: '保存授权码失败，请重试', type: 'error' });
+      submitLoading.value = false;
+      return;
+    }
+    Notification.message({ message: '登录成功', type: 'success' });
     submitLoading.value = false;
+    router.push({ name: 'HomeIndex' });
   }).catch(error => {
-    Notification.message({ message: '授权服务不可达，请稍后重试', type: 'error' });
+    const serverMsg = error && error.response && error.response.data && error.response.data.msg;
+    Notification.message({ message: serverMsg || '授权服务不可达，请稍后重试', type: 'error' });
     submitLoading.value = false
   })
 };

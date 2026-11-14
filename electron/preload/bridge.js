@@ -8,6 +8,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const INVOKE_CHANNELS = new Set([
   // 登录
   'controller.login.getMachineCode',
+  'controller.login.saveAuthCode',
   // 会话管理
   'controller.window.getSessions',
   'controller.window.addSession',

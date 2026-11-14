@@ -1,0 +1,1 @@
+{"description":"多平台聊天翻译工具的本地后端：翻译服务、授权服务器、更新分发。零依赖，只用 Node 内置模块。","name":"translation-server","private":true,"scripts":{"start":"node index.js"},"version":"1.0.0"}
