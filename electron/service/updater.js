@@ -27,6 +27,8 @@ class UpdaterService extends Service {
             downloaded: 4,
         }
         const config = {
+            // TODO(更新服务)：更新分发服务尚未搭建，url/token 均为空，待接入真实地址后填写；
+            // 当前不会发起任何更新请求。不要填占位/第三方地址。
             // CDN 目录url 如果 https 无法下载，换成 http
             url: '',
             // 如果有特殊平台，可以指定一个固定的 json 文件

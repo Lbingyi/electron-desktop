@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
-    "better-sqlite3": "^11.5.0",
+    "better-sqlite3": "^12.11.1",
     "dayjs": "^1.10.7",
     "ee-core": "2.11.0",
     "ee-incremental-updater": "^2.1.0",

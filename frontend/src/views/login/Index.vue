@@ -33,13 +33,12 @@
 import lottie from "lottie-web";
 import animationData from "@/assets/json/bg.json";
 import Notification from "@/utils/notification";
-import {decrypt, encrypt} from "@/utils/rsaEncrypt";
+import {encrypt} from "@/utils/rsaEncrypt";
 import {post} from "@/utils/request";
 import {ipc} from "@/utils/ipcRenderer";
 
 import { DocumentCopy } from '@element-plus/icons-vue'
 import {onMounted, reactive, ref} from 'vue';
-import { useRouter } from 'vue-router';
 
 
 const submitLoading = ref(false)
@@ -75,7 +74,6 @@ const copyMachineCode = ()=>{
 // # 定义通信频道，即路由
 const ipcApiRoute = {
   getMachineCode: 'controller.login.getMachineCode',
-  saveAuthCode: 'controller.login.saveAuthCode',
 }
 
 onMounted(()=>{
@@ -95,7 +93,6 @@ const form = reactive({
   agree: false,
   remember: false,
 });
-const router = useRouter();
 const handleLogin = () => {
   // if (!form.agree) {
   //   Notification.message({ message: '请同意用户服务协议', type: 'info' });
@@ -114,35 +111,13 @@ const handleLogin = () => {
 
   let jsonData = {timestamp: oldTimestamp,jsonData: encrypt(JSON.stringify(data))};
   post("/authManage/clientAuth",jsonData).then(res => {
-    if (res.code === 200) {
-      const {timestamp,jsonData} = res.data
-      let authData = JSON.parse(decrypt(jsonData));
-      if (timestamp.toString() === authData.timestamp.toString()) {
-        //判断是否过期
-        let expiryDate = authData.expiryDate;
-        const currentTime = Date.now()
-        if (expiryDate < currentTime) {
-          Notification.message({ message: '账号已到期请联系管理员续费', type: 'error' });
-          submitLoading.value = false
-          return;
-        }
-        //存储授权码
-        ipc.invoke(ipcApiRoute.saveAuthCode, authData).then(res => {
-          if (res.status) {
-            Notification.message({ message: '验证成功', type: 'success' });
-            submitLoading.value = false
-            //跳转页面
-            router.push('/home')
-          }else {
-            Notification.message({ message: '网络连接异常请重试', type: 'warning' });
-          }
-        })
-      }else {
-        Notification.message({ message: '验证失败', type: 'error' });
-        submitLoading.value = false
-      }
-    }
+    // Fail closed：客户端已彻底移除 RSA 私钥，无法验证授权服务器响应的真实性。
+    // 在授权服务器建成、并实现可验证的响应方案（服务端签名、客户端公钥验签）之前，
+    // 任何响应都视为不可信，登录一律拒绝。禁止在此恢复 decrypt、或采信未经验证的响应。
+    Notification.message({ message: '授权服务未就绪，登录已拒绝', type: 'error' });
+    submitLoading.value = false;
   }).catch(error => {
+    Notification.message({ message: '授权服务不可达，请稍后重试', type: 'error' });
     submitLoading.value = false
   })
 };

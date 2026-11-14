@@ -28,12 +28,6 @@
     "createStartMenuShortcut": true,
     "shortcutName": "seaToolbox"
   },
-  "publish": [
-    {
-      "provider": "generic",
-      "url": "https://github.com/wallace5303/electron-egg"
-    }
-  ],
   "mac": {
     "icon": "build/icons/icon.icns",
     "artifactName": "${productName}-${os}-${version}-${arch}.${ext}",

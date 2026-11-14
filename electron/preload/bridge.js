@@ -1,9 +1,87 @@
-// 使用 CommonJS 语法
+// 预加载桥接（preload）：运行于隔离上下文（contextIsolation: true）。
+// 只暴露白名单内的频道与方法；原始 ipcRenderer 对象绝不暴露给渲染进程。
 const { contextBridge, ipcRenderer } = require('electron');
 
-// 在 contextBridge 中暴露 API 给渲染进程
+// 渲染进程可 invoke 的频道白名单（与 frontend/src 实际调用一致）。
+// 注意：controller.window.executeJavaScript 不在白名单里——该通道不存在，
+// 且不允许渲染进程向会话视图执行任意 JS（见 controller 层说明）。
+const INVOKE_CHANNELS = new Set([
+  // 登录
+  'controller.login.getMachineCode',
+  // 会话管理
+  'controller.window.getSessions',
+  'controller.window.addSession',
+  'controller.window.deleteSession',
+  'controller.window.refreshSession',
+  'controller.window.selectSession',
+  'controller.window.initSession',
+  'controller.window.addConfigInfo',
+  'controller.window.getConfigInfo',
+  'controller.window.hideWindow',
+  'controller.window.logout',
+  'controller.window.filterNumber',
+  'controller.window.getPhoneNumberList',
+  'controller.window.deletePhoneNumber',
+  'controller.window.sendMessage',
+  // 用户画像 / 跟进
+  'controller.user.addFollowRecord',
+  'controller.user.getUserPortrait',
+  'controller.user.updateUserInfo',
+  // 更新器
+  'controller.updater.appInfo',
+  'controller.updater.checkForUpdater',
+  'controller.updater.downloadApp',
+  'controller.updater.relaunchApp',
+  // 示例页（controller.example.*，随示例清理时一并移除）
+  'controller.example.test',
+  'controller.example.addWindow',
+]);
+
+// 主进程可向渲染进程推送的频道白名单
+const LISTEN_CHANNELS = new Set([
+  'online-notify',
+  'new-message-notify',
+  'open-user-portrait',
+  'number_filter-notify',
+  'custom.app.updater',
+]);
+
+function assertInvokeChannel(channel) {
+  if (!INVOKE_CHANNELS.has(channel)) {
+    throw new Error(`[bridge] invoke 被拒绝，未授权频道：${channel}`);
+  }
+}
+
+function assertListenChannel(channel) {
+  if (!LISTEN_CHANNELS.has(channel)) {
+    throw new Error(`[bridge] listen 被拒绝，未授权频道：${channel}`);
+  }
+}
+
+// 只暴露最小方法集的 IPC 包装：invoke / on / removeAllListeners。
+// 不暴露 ipcRenderer 本体，不暴露 send / sendSync / once。
+const safeIpc = {
+  invoke: (channel, ...args) => {
+    assertInvokeChannel(channel);
+    return ipcRenderer.invoke(channel, ...args);
+  },
+  on: (channel, listener) => {
+    assertListenChannel(channel);
+    return ipcRenderer.on(channel, listener);
+  },
+  removeAllListeners: (channel) => {
+    assertListenChannel(channel);
+    return ipcRenderer.removeAllListeners(channel);
+  },
+};
+
+// frontend/src/utils/ipcRenderer.js 通过 window.electron.ipcRenderer 取用
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: safeIpc,
+});
+
+// 在 contextBridge 中暴露 API 给渲染进程（供会话视图内的平台注入脚本使用）
 contextBridge.exposeInMainWorld('electronAPI', {
-  ipcRenderer: ipcRenderer,
   // 号码过滤通知
   sendFilterNotify: (data) => {
     ipcRenderer.send('filter-notify', data);
@@ -80,8 +158,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 });
 
 // 在页面加载完成时发送消息，包括当前页面的 URL
+// 注意：主窗口加载的是 file:// 本地页面，不需要注入平台脚本，只对 http(s) 页面发送。
 window.addEventListener('load', () => {
   const currentURL = window.location.href;
+  if (currentURL.startsWith('file://')) return;
   //执行对应平台的js代码
   ipcRenderer.send('execute-js-operation', currentURL);
   // window.electron.ipcRenderer.on('show-notify', async (event, args) => {
@@ -89,4 +169,3 @@ window.addEventListener('load', () => {
   //   window.electron.showNotification(message, 'is-'+type);
   // });
 });
-

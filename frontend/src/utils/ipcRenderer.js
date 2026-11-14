@@ -1,4 +1,7 @@
-const Renderer = (window.require && window.require('electron')) || window.electron || {};
+// 主窗口已关闭 nodeIntegration、开启 contextIsolation，渲染进程只能通过
+// preload bridge.js 暴露的 window.electron.ipcRenderer（白名单包装）访问 IPC，
+// 不再使用 window.require('electron')。
+const Renderer = window.electron || {};
 
 /**
  * ipc

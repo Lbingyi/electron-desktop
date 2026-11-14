@@ -21,13 +21,9 @@ const configForm = reactive({
   username: '',       // 对应数据库的 `proxy_username`
   password: ''        // 对应数据库的 `proxy_password`
 });
-const jsCode = ref('')
-const executeCode = (card)=>{
-  const args = {cardId:card.cardId,code:jsCode.value};
-  ipc.invoke(ipcApiRoute.executeJavaScript, args).then(res => {
-    console.log(res)
-  })
-}
+// 注意：原 executeCode（经 controller.window.executeJavaScript 向会话视图执行任意 JS）已删除。
+// 该通道在主进程不存在，且不允许渲染进程向已登录的会话视图执行任意 JS；
+// 合法的脚本注入只走主进程按 URL 匹配的 electron/scripts/<平台>.js（见 electron/index.js 的 execute-js-operation）。
 const settingPanel = ref(false)
 const importPanel = ref(false)
 const userPortraitPanel = ref(false)
@@ -54,7 +50,6 @@ const ipcApiRoute = {
   initSession: 'controller.window.initSession',
   addConfigInfo: 'controller.window.addConfigInfo',
   getConfigInfo: 'controller.window.getConfigInfo',
-  executeJavaScript: 'controller.window.executeJavaScript',
   hideWindow: 'controller.window.hideWindow',
 };
 

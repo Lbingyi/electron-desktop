@@ -30,10 +30,10 @@ module.exports = (appInfo) => {
     minHeight: 700,
     webPreferences: {
       //webSecurity: false,
-      contextIsolation: false, // false -> 可在渲染进程中使用electron的api，true->需要bridge.js(contextBridge)
-      nodeIntegration: true,
+      contextIsolation: true, // true -> 渲染进程只能经 preload bridge.js（contextBridge）访问白名单接口
+      nodeIntegration: false,
       devTools: false,
-      //preload: path.join(appInfo.baseDir, 'preload', 'bridge.js'),
+      preload: path.join(appInfo.baseDir, 'preload', 'bridge.js'),
     },
     frame: true,
     show: false,
@@ -168,7 +168,9 @@ module.exports = (appInfo) => {
       linux: false,
       options: {
         provider: 'generic',
-        url: 'http://kodo.qiniu.com/'
+        // TODO(更新服务)：更新分发服务尚未搭建，feed 地址待接入真实地址后填写；
+        // 当前三平台均为 false，不会发起任何更新请求。不要填占位/第三方地址。
+        url: ''
       },
       force: false,
     }
