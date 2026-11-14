@@ -23,7 +23,14 @@ const HOST = process.env.HOST || '127.0.0.1';
 const PORT = Number(process.env.PORT || 8000);
 const AUTH_EXPIRY_DAYS = Number(process.env.AUTH_EXPIRY_DAYS || 365);
 const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000; // 客户端时间戳与服务器时间相差超过 5 分钟即拒绝
-const MACHINE_CODE_RE = /^[0-9a-fA-F]{32,128}$/; // node-machine-id 输出为十六进制串
+const MACHINE_CODE_RE = /^[0-9a-fA-F]{32,128}$/;
+// 客户端用 machineIdSync({ original: true }) 取原始硬件码，Windows 上是带连字符的
+// UUID（如 A1B2C3D4-E5F6-47AB-8C9D-0123456789AB），不是纯十六进制串。先去掉连字符和
+// 花括号、统一小写再校验，入库也用归一化后的值，同一台机器重复登录才能对应上。
+function normalizeMachineCode(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/[{}-]/g, '').toLowerCase();
+}
 
 const UPDATE_PATH = path.join(__dirname, 'update.json');
 let defaultVersion = '1.0.0';
@@ -104,9 +111,9 @@ async function handleClientAuth(req, res) {
   } catch (err) {
     return sendJson(res, 401, { code: 401, msg: '解密失败', message: '解密失败' });
   }
-  const machineCode = payload.machineCode;
+  const machineCode = normalizeMachineCode(payload.machineCode);
   const timestamp = Number(payload.timestamp);
-  if (typeof machineCode !== 'string' || !MACHINE_CODE_RE.test(machineCode)) {
+  if (!MACHINE_CODE_RE.test(machineCode)) {
     return sendJson(res, 403, { code: 403, msg: '机器码格式无效', message: '机器码格式无效' });
   }
   if (!Number.isFinite(timestamp) || Math.abs(Date.now() - timestamp) > TIMESTAMP_TOLERANCE_MS) {
