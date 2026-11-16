@@ -17,6 +17,10 @@ async function translateText(text,localLanguage, targetLanguage) {
         targetLang: targetLanguage,
         text: text,
         authCode: app.authCode, // 假设 authCode 已定义在 window 中
+        // Stage 1：员工登录后带上 staffToken / workspaceId，服务器把这次翻译的
+        // 字符数记到该员工名下；没登录员工时只记机器级用量。
+        staffToken: app.staffToken || undefined,
+        workspaceId: app.workspaceId || undefined,
     };
     try {
         // 使用封装好的 request 模块的 POST 方法发送数据

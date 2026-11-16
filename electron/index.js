@@ -9,6 +9,36 @@ const {translateText,getLanguages} = require('./api/index')
 const Addon = require("ee-core/addon");
 const Storage = require("ee-core/storage");
 const Database = require('./utils/DatabaseUtils');
+
+// Stage 1：端口心跳（10 秒防抖）。会话在线状态变化时，把当前在线的账号数
+// 上报给本地后端（POST /api/usage/heartbeat），供用量账本记端口峰值。
+// 未登录机器授权时不上报；上报失败只记日志，绝不影响会话状态更新。
+let portHeartbeatTimer = null;
+function schedulePortHeartbeat() {
+  if (portHeartbeatTimer) return;
+  portHeartbeatTimer = setTimeout(() => {
+    portHeartbeatTimer = null;
+    reportPortHeartbeat().catch(() => {});
+  }, 10000);
+}
+async function reportPortHeartbeat() {
+  if (!app.authCode) return;
+  let onlineCards = [];
+  try {
+    onlineCards = app.sdb.select('cards', { online_status: 'true' }) || [];
+  } catch (err) {
+    return;
+  }
+  try {
+    await request.post('/api/usage/heartbeat', {
+      authCode: app.authCode,
+      workspaceId: app.workspaceId || undefined,
+      onlineCardIds: onlineCards.map((c) => c.card_id).filter(Boolean),
+    });
+  } catch (err) {
+    Log.info('端口心跳上报失败（不影响使用）：', err && err.message);
+  }
+}
 class Index extends Application {
   constructor() {
     super();
@@ -157,6 +187,7 @@ class Index extends Application {
           mainWin.webContents.send('online-notify', { cardId: cardId, onlineStatus: online,avatarUrl:avatarUrl });
             Log.info(`登录状态发生改变已发送给渲染程序`);
           }
+          schedulePortHeartbeat();
         }
         return {status:true,message:'状态修改成功！'}
       } else {
