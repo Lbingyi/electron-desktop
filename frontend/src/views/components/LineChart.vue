@@ -3,27 +3,35 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as echarts from 'echarts'
 
-// 获取过去七天的日期
+// 数据来自父组件调 /api/usage/daily 拿到的真实按日用量：
+// [{date: 'MM-DD', translateCount, chars}, ...]。
+// 没传数据时显示最近 7 天、全部为 0——不编造演示数字。
+const props = defineProps({
+  days: {
+    type: Array,
+    default: () => [],
+  },
+})
+
+const chartRef = ref(null)
+let chartInstance = null
+
 const getLast7Days = () => {
   const dates = []
   for (let i = 6; i >= 0; i--) {
     const date = new Date()
     date.setDate(date.getDate() - i)
-    dates.push(`${date.getMonth() + 1}-${date.getDate()}`)
+    dates.push(`${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`)
   }
   return dates
 }
 
-const chartRef = ref(null)
-let chartInstance = null
-
-const initChart = () => {
-  // 初始化图表
-  chartInstance = echarts.init(chartRef.value)
-  const option = {
+const buildOption = () => {
+  const hasData = Array.isArray(props.days) && props.days.length > 0
+  return {
     tooltip: {
       trigger: 'axis'
     },
@@ -32,7 +40,7 @@ const initChart = () => {
     },
     xAxis: {
       type: 'category',
-      data: getLast7Days()
+      data: hasData ? props.days.map((d) => d.date) : getLast7Days()
     },
     yAxis: {
       type: 'value'
@@ -41,17 +49,29 @@ const initChart = () => {
       {
         name: '翻译次数',
         type: 'line',
-        data: [120, 132, 101, 134, 90, 230, 210]
+        data: hasData ? props.days.map((d) => d.translateCount) : [0, 0, 0, 0, 0, 0, 0]
       },
       {
         name: '消耗字符数',
         type: 'line',
-        data: [220, 182, 191, 234, 290, 330, 310]
+        data: hasData ? props.days.map((d) => d.chars) : [0, 0, 0, 0, 0, 0, 0]
       }
     ]
   }
-  chartInstance.setOption(option)
 }
+
+const renderChart = () => {
+  if (!chartInstance) return
+  chartInstance.setOption(buildOption())
+}
+
+const initChart = () => {
+  // 初始化图表
+  chartInstance = echarts.init(chartRef.value)
+  renderChart()
+}
+
+watch(() => props.days, renderChart, { deep: true })
 
 onMounted(() => {
   initChart()

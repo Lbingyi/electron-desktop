@@ -37,12 +37,14 @@ import HomePage from "@/views/platform/HomePage.vue";
 import WhatsApp from "@/views/platform/WhatsApp.vue";
 import Telegram from "@/views/platform/Telegram.vue";
 import TelegramK from "@/views/platform/TelegramK.vue";
+import Team from "@/views/platform/Team.vue";
 
 // 导入图标文件
 import homeIcon from '@/assets/svgs/index.svg';
 import whatsappIcon from '@/assets/svgs/whatsapp.svg';
 import telegramIcon from '@/assets/svgs/telegram.svg';
 import telegramKIcon from '@/assets/svgs/telegramK.svg';
+import teamIcon from '@/assets/svgs/team.svg';
 import quitIcon from '@/assets/svgs/quit.svg';
 import { ipc } from '@/utils/ipcRenderer';
 // 定义通信频道，即路由
@@ -56,6 +58,7 @@ const menuItems = [
   { id: 'whatsApp', icon: whatsappIcon, component: markRaw(WhatsApp) },
   { id: 'telegram', icon: telegramIcon, component: markRaw(Telegram) },
   { id: 'telegramK', icon: telegramKIcon, component: markRaw(TelegramK) },
+  { id: 'team', icon: teamIcon, component: markRaw(Team) },
 ];
 
 const activeMenu = ref('home');
