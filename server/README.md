@@ -11,6 +11,26 @@
 | `POST /api/authManage/clientAuth` | 授权。客户端发 RSA 加密的 `{machineCode, authCode: '', timestamp}`，成功返回明文 `{code: 200, authCode, expiryDate}`（expiryDate 为毫秒时间戳） |
 | `GET /update/latest` | 更新 feed，读 `server/update.json`，返回 `{version, notes, url}` |
 | `GET /health` | 健康检查，返回 `{ok: true}` |
+| `POST /api/workspace/create` | 创建工作区（Stage 1）。入参 `{authCode, name}`，老板机器创建，返回 `{code: 200, workspace}` |
+| `POST /api/workspace/list` | 列出本机创建的工作区。入参 `{authCode}` |
+| `POST /api/workspace/staff/create` | 创建员工（老板）。入参 `{authCode, workspaceId, username, password, displayName, role}`，role 只能是 `supervisor`（主管）或 `agent`（客服），密码至少 6 位 |
+| `POST /api/workspace/staff/login` | 员工登录。入参 `{workspaceId, username, password}`，返回 `{code: 200, staffToken, staffId, role, workspaceId, expiresAt}`（token 24 小时有效） |
+| `POST /api/workspace/staff/list` | 列员工。入参 `{authCode 或 staffToken, workspaceId}`；老板与主管看全部，客服只看自己 |
+| `POST /api/workspace/staff/assign` | 分配平台账号给员工（老板/主管）。入参 `{authCode 或 staffToken, workspaceId, staffId, cardId}` |
+| `POST /api/workspace/staff/unassign` | 收回分配。同上 |
+| `POST /api/workspace/staff/me/accounts` | 当前员工可见的账号。入参 `{staffToken}`；主管返回 `scope: 'all'`，客服返回 `scope: 'assigned'` 与自己的 cardId 列表 |
+| `POST /api/usage/record` | 手动记一笔用量。入参 `{authCode, staffToken?, workspaceId?, kind, amount, cardId?, note?}`，kind 为 `translate_chars` / `port_online` / `ai_points` |
+| `POST /api/usage/heartbeat` | 端口心跳：上报当前在线账号。入参 `{authCode, workspaceId?, onlineCardIds: []}`，返回 `{online, quota, overQuota}` |
+| `POST /api/usage/summary` | 用量汇总（默认本月）。入参 `{authCode 或 staffToken, workspaceId, from?, to?}`；客服只汇总自己的 |
+| `POST /api/usage/daily` | 按日汇总（供首页图表）。入参 `{authCode 或 staffToken, workspaceId, days?}`，无事件的日子补 0 |
+
+## Stage 1 云端骨架：工作区、员工、用量账本
+
+- **角色**：老板 = 创建工作区的机器（凭机器授权码 `authCode` 行使权限）；主管与客服是员工账号（用户名 + 密码登录，拿 `staffToken`）。老板能建员工、分配账号、看全部用量；主管能分配账号、看绩效、不能改计费（计费接口在阶段 2）；客服只用被分配的账号、只看自己的统计。
+- **密码**：员工密码用 `crypto.scrypt` 加盐哈希存库，不存明文；登录失败不区分是用户名错还是密码错。员工 token 24 小时过期。
+- **用量**：翻译成功后服务器自动记账（字符数按 JS 字符串长度计；`POST /api/translate` 可附带 `staffToken` / `workspaceId` 做员工级归属，未建工作区的机器照常翻译、只不记账）。端口在线数由客户端心跳上报（`POST /api/usage/heartbeat`）。AI 点数目前没有产生方，账本里留了口子，汇总为 0。
+- **额度**：工作区建好即带骨架默认值——端口 3、每月翻译字符 300000、每月 AI 点数 1000（按方案试用口径）。**Stage 1 只记录、只汇总、只展示，不做超量拦截与付费墙**（那是阶段 2 的事）；心跳超端口时返回 `overQuota: true` 由界面提示。
+- **测试隔离**：`SERVER_DATA_DIR` 环境变量可把数据目录（含密钥对与 auth.db）指到临时目录，默认仍是 `server/data/`。不要动真实的 `server/data/`，也不要提交它（已进 `.gitignore`）。
 
 ## 与原版协议的偏差（重要）
 

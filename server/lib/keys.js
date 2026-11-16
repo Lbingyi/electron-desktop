@@ -9,7 +9,9 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// 数据目录：默认 server/data/；测试时可用 SERVER_DATA_DIR 环境变量指向临时目录
+// （与 server/lib/db.js 一致，默认行为不变）。
+const DATA_DIR = process.env.SERVER_DATA_DIR || path.join(__dirname, '..', 'data');
 const PRIVATE_KEY_PATH = path.join(DATA_DIR, 'rsa-private.pem');
 const PUBLIC_KEY_PATH = path.join(DATA_DIR, 'rsa-public.pem');
 

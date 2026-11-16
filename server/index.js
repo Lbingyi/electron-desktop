@@ -17,6 +17,9 @@ const path = require('node:path');
 const { LANGUAGES } = require('./lib/languages');
 const keys = require('./lib/keys');
 const db = require('./lib/db');
+const workspace = require('./lib/workspace');
+const { sendJson, readJsonBody } = require('./lib/http');
+const { handleWorkspaceRoute } = require('./lib/workspaceRoutes');
 const { translateText } = require('./lib/translate');
 
 const HOST = process.env.HOST || '127.0.0.1';
@@ -42,44 +45,7 @@ try {
 
 const { privateKey } = keys.ensureKeyPair();
 db.getDb();
-
-function sendJson(res, status, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(status, {
-    'Content-Type': 'application/json; charset=utf-8',
-    'Content-Length': Buffer.byteLength(body),
-  });
-  res.end(body);
-}
-
-function readJsonBody(req, limitBytes) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > limitBytes) {
-        reject(new Error('请求体过大'));
-        req.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on('end', () => {
-      const text = Buffer.concat(chunks).toString('utf8');
-      if (!text) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(text));
-      } catch (err) {
-        reject(new Error('请求体不是合法 JSON'));
-      }
-    });
-    req.on('error', reject);
-  });
-}
+workspace.ensureWorkspaceSchema();
 
 function readUpdateFile() {
   try {
@@ -142,7 +108,8 @@ async function handleTranslate(req, res) {
   if (typeof fromLang !== 'string' || typeof targetLang !== 'string') {
     return sendJson(res, 400, { code: 400, msg: 'fromLang / targetLang 缺失', message: 'fromLang / targetLang 缺失' });
   }
-  if (!db.validateAuthCode(authCode)) {
+  const auth = db.validateAuthCode(authCode);
+  if (!auth) {
     return sendJson(res, 401, { code: 401, msg: 'authCode 无效或已过期', message: 'authCode 无效或已过期' });
   }
   const apiBase = process.env.TRANSLATE_API_BASE;
@@ -162,6 +129,18 @@ async function handleTranslate(req, res) {
       model,
       languages: LANGUAGES,
     });
+    // 翻译成功才记账：字符数按 JS 字符串长度计；记账失败绝不影响翻译返回。
+    // 未建工作区的机器照常翻译，只是不记账（recordTranslationUsage 返回 ok:false）。
+    try {
+      workspace.recordTranslationUsage({
+        machineCode: auth.machineCode,
+        staffToken: typeof body.staffToken === 'string' ? body.staffToken : null,
+        workspaceId: typeof body.workspaceId === 'string' ? body.workspaceId : null,
+        chars: text.length,
+      });
+    } catch (err) {
+      console.error('用量记账失败（翻译已返回，不影响）：', err.message);
+    }
     return sendJson(res, 200, { code: 200, data: translated });
   } catch (err) {
     return sendJson(res, 502, { code: 502, msg: '翻译上游调用失败', message: '翻译上游调用失败' });
@@ -195,6 +174,14 @@ const server = http.createServer((req, res) => {
       }
     });
   }
+  // Stage 1 云端骨架：工作区 / 员工 / 用量账本（见 server/lib/workspaceRoutes.js）。
+  if (pathname.startsWith('/api/workspace/') || pathname.startsWith('/api/usage/')) {
+    return handleWorkspaceRoute(req, res, pathname).then((handled) => {
+      if (!handled && !res.writableEnded) {
+        sendJson(res, 404, { code: 404, msg: '未找到该接口', message: '未找到该接口' });
+      }
+    });
+  }
   if (req.method === 'GET' && pathname === '/') {
     return sendJson(res, 200, {
       service: 'translation-server',
@@ -204,6 +191,18 @@ const server = http.createServer((req, res) => {
         'POST /api/authManage/clientAuth',
         'GET /update/latest',
         'GET /health',
+        'POST /api/workspace/create',
+        'POST /api/workspace/list',
+        'POST /api/workspace/staff/create',
+        'POST /api/workspace/staff/login',
+        'POST /api/workspace/staff/list',
+        'POST /api/workspace/staff/assign',
+        'POST /api/workspace/staff/unassign',
+        'POST /api/workspace/staff/me/accounts',
+        'POST /api/usage/record',
+        'POST /api/usage/heartbeat',
+        'POST /api/usage/summary',
+        'POST /api/usage/daily',
       ],
     });
   }

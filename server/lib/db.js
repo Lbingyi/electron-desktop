@@ -4,7 +4,10 @@
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
 
-const DB_PATH = path.join(__dirname, '..', 'data', 'auth.db');
+// 数据目录：默认 server/data/；测试时可用 SERVER_DATA_DIR 环境变量指向临时目录，
+// 避免测试数据污染真实授权库（默认行为不变）。
+const DATA_DIR = process.env.SERVER_DATA_DIR || path.join(__dirname, '..', 'data');
+const DB_PATH = path.join(DATA_DIR, 'auth.db');
 
 let db = null;
 
